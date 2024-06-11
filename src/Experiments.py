@@ -129,9 +129,10 @@ def Linear_Signal_Experiment(
             f"Window {i+1}: Mean={mean_value}, Variance={variance_value}, Skewness={skewness_value}, Kurtosis={kurtosis_value}"
         )
 
-    moments_observation(moments, num_windows, experiment_dir)
+    
     
     """
+    moments_observation(moments, num_windows, experiment_dir)
     return moments
 
 
@@ -243,9 +244,9 @@ def Classical_Signal_Experiment(
         print(
             f"Window {i+1}: Mean={mean_value}, Variance={variance_value}, Skewness={skewness_value}, Kurtosis={kurtosis_value}"
         )
-    moments_observation(moments, num_windows, experiment_dir)
 
     """
+    moments_observation(moments, num_windows, experiment_dir)
     return moments
 
 
@@ -420,8 +421,9 @@ def Piecewise_Signal_Experiment(
         print(
             f"Window {i+1}: Mean={mean_value}, Variance={variance_value}, Skewness={skewness_value}, Kurtosis={kurtosis_value}"
         )
-    moments_observation(moments, num_windows, experiment_dir)
+
     """
+    moments_observation(moments, num_windows, experiment_dir)
     return moments
 
 
@@ -598,6 +600,7 @@ def Sine_Signal_Experiment(
         print(
             f"Window {i+1}: Mean={mean_value}, Variance={variance_value}, Skewness={skewness_value}, Kurtosis={kurtosis_value}"
         )
-    moments_observation(moments, num_windows, experiment_dir)
+
     """
+    moments_observation(moments, num_windows, experiment_dir)
     return moments
