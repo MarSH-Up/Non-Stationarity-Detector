@@ -52,14 +52,8 @@ def main():
     print("Stationarity Results Linear Signal:")
     for key, value in results.items():
         print(f"{key}: {value}")
-
-    frequency = 1
-    length = 20
-    sampling_rate = 1000
-    window_length = 5000
-
     moments_clasical_signal = Classical_Signal_Experiment(
-        frequency, length, sampling_rate, window_length, 2500
+        frequency, length, sampling_rate, window_length, 1000
     )
     results = evaluate_stationarity(moments_clasical_signal)
     print("Stationarity Results Classical Signal:")
