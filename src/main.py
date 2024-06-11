@@ -20,7 +20,6 @@ def main():
         window_length,
         window_overlaping,
     )
-
     results = evaluate_stationarity(moments_sine_signal)
     print("Stationarity Results Sine Signal:")
     for key, value in results.items():
@@ -35,7 +34,6 @@ def main():
         window_length,
         window_overlaping,
     )
-
     results = evaluate_stationarity(moments_piecewise_signal)
     print("Stationarity Results Piecewisw Signal:")
     for key, value in results.items():
@@ -50,9 +48,7 @@ def main():
         window_length,
         window_overlaping,
     )
-
     results = evaluate_stationarity(moments_linear_signal)
-
     print("Stationarity Results Linear Signal:")
     for key, value in results.items():
         print(f"{key}: {value}")
@@ -65,7 +61,6 @@ def main():
     moments_clasical_signal = Classical_Signal_Experiment(
         frequency, length, sampling_rate, window_length, 2500
     )
-
     results = evaluate_stationarity(moments_clasical_signal)
     print("Stationarity Results Classical Signal:")
     for key, value in results.items():
