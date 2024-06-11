@@ -65,3 +65,21 @@ def generate_nonstationary_sine(
     signal = amplitude * np.sin(2 * np.pi * frequency * t)
 
     return t, signal, amplitude
+
+
+def generate_classical_sine(frequency, length, sampling_rate):
+    """
+    Generates a classical sine signal.
+
+    Parameters:
+        frequency (float): Frequency of the sine wave.
+        length (int): Length of the signal in seconds.
+        sampling_rate (int): Number of samples per second.
+
+    Returns:
+        t (numpy.ndarray): Time array.
+        signal (numpy.ndarray): Generated sine signal.
+    """
+    t = np.linspace(0, length, length * sampling_rate)
+    signal = np.sin(2 * np.pi * frequency * t)
+    return t, signal

@@ -1,1 +1,4 @@
 ## Non stationary detector
+
+
+- 

@@ -1,19 +1,4 @@
-import os
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.stats import skew, kurtosis
-
-
-def moment_variance(signal):
-    return np.var(signal)
-
-
-def moment_skew(signal):
-    return skew(signal)
-
-
-def moment_skew(signal):
-    return kurtosis(signal)
 
 
 def evaluate_stationarity(moments, std_multiplier=1.5):
@@ -84,44 +69,3 @@ def evaluate_stationarity(moments, std_multiplier=1.5):
         "Kurtosis Stationary": is_kurtosis_stationary,
         "Overall Stationary": is_stationary,
     }
-
-
-def moments_observation(moments, num_windows, experiment_name):
-    experiment_dir = experiment_name
-    os.makedirs(experiment_dir, exist_ok=True)
-    means = [moment[0] for moment in moments]
-    variances = [moment[1] for moment in moments]
-    skewnesses = [moment[2] for moment in moments]
-    kurtoses = [moment[3] for moment in moments]
-
-    # Window data
-    # Plotting the statistical moments over time
-    fig, axs = plt.subplots(4, 1, figsize=(10, 12))
-
-    axs[0].plot(range(1, num_windows + 1), means, marker="o")
-    axs[0].set_title("Mean Over Time")
-    axs[0].set_xlabel("Window Index")
-    axs[0].set_ylabel("Mean")
-    axs[0].grid(True)
-
-    axs[1].plot(range(1, num_windows + 1), variances, marker="o", color="orange")
-    axs[1].set_title("Variance Over Time")
-    axs[1].set_xlabel("Window Index")
-    axs[1].set_ylabel("Variance")
-    axs[1].grid(True)
-
-    axs[2].plot(range(1, num_windows + 1), skewnesses, marker="o", color="green")
-    axs[2].set_title("Skewness Over Time")
-    axs[2].set_xlabel("Window Index")
-    axs[2].set_ylabel("Skewness")
-    axs[2].grid(True)
-
-    axs[3].plot(range(1, num_windows + 1), kurtoses, marker="o", color="red")
-    axs[3].set_title("Kurtosis Over Time")
-    axs[3].set_xlabel("Window Index")
-    axs[3].set_ylabel("Kurtosis")
-    axs[3].grid(True)
-
-    plt.tight_layout()
-    plt.savefig(os.path.join(experiment_dir, "statistical_moments_observations.png"))
-    plt.show()

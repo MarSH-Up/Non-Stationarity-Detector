@@ -9,6 +9,7 @@ def incremental_average(signal):
     return Q_k_values
 
 
+# https://www.youtube.com/watch?v=joHKNtPYtLo
 def exponential_moving_average(signal, alpha=0.1):
     ema_values = []
     ema = 0
