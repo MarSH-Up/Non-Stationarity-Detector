@@ -8,8 +8,10 @@ def main():
     length = 5 * len(variances)  # Length of the signal in seconds
     sampling_rate = 1000  # Number of samples per second
     interval = 5000  # Interval of 5000 samples
-    window_length = 5000
-    window_overlaping = 2500
+
+    # Half of interval
+    window_length = 2500
+    window_overlaping = 1250
 
     moments_sine_signal = Sine_Signal_Experiment(
         frequency,
@@ -53,7 +55,7 @@ def main():
     for key, value in results.items():
         print(f"{key}: {value}")
     moments_clasical_signal = Classical_Signal_Experiment(
-        frequency, length, sampling_rate, window_length, 1000
+        frequency, length, sampling_rate, window_length, window_overlaping
     )
     results = evaluate_stationarity(moments_clasical_signal)
     print("Stationarity Results Classical Signal:")
