@@ -1,4 +1,35 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import jarque_bera
+from statsmodels.tsa.stattools import adfuller, kpss
+from statsmodels.stats.diagnostic import acorr_ljungbox
+
+
+def adf_test(series):
+    result = adfuller(series)
+    return result[0], result[1]
+
+
+def kpss_test(series):
+    result = kpss(series, regression="c")
+    return result[0], result[1]
+
+
+def jarque_bera_test(series):
+    jb_stat, jb_p_value = jarque_bera(series)
+    return jb_stat, jb_p_value
+
+
+def ljung_box_test(series, lags=10):
+    result = acorr_ljungbox(series, lags=lags)
+    return result["lb_stat"], result["lb_pvalue"]
+
+
+def analyze_stationarity(window_signal):
+    adf_stat, adf_p = adf_test(window_signal)
+    kpss_stat, kpss_p = kpss_test(window_signal)
+
+    return {"adf_p": adf_p, "kpss_p": kpss_p}
 
 
 def evaluate_stationarity(moments, std_multiplier=1.5):
