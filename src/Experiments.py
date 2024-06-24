@@ -442,7 +442,7 @@ def Piecewise_Signal_Experiment_Tests(
 
     # Generate the signal using k_piecewise
     t, signal_piecewise, amplitude = generate_nonstationary_sine(
-        frequency, variances, length, sampling_rate, interval, k_func=k_sin
+        frequency, variances, length, sampling_rate, interval, k_func=k_piecewise
     )
     # Calculate moving averages
     moving_average_signal = incremental_average(signal_piecewise)
@@ -923,3 +923,116 @@ def Linear_Signal_Experiment_Tests(
 
     moments_observation(moments, num_windows, experiment_dir)
     return moments, stationarity_results, signal_linear
+
+
+def Piecewise_Signal_Experiment_Test_Complete(
+    frequency,
+    variances,
+    length,
+    sampling_rate,
+    interval,
+    window_length,
+    window_overlapping,
+):
+    experiment_dir = "images/temp_Signal_Experiment_Window"
+    os.makedirs(experiment_dir, exist_ok=True)
+
+    # Generate the signal using k_piecewise
+    t, signal_piecewise, amplitude = generate_nonstationary_sine(
+        frequency, variances, length, sampling_rate, interval, k_func=k_piecewise
+    )
+    # Calculate moving averages
+    moving_average_signal = incremental_average(signal_piecewise)
+    moving_average_amplitude = incremental_average(amplitude)
+
+    # Plot the signal with k_piecewise
+    plt.plot(t, signal_piecewise)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude")
+    plt.title("Non-stationary Sine Signal with Piecewise Constant Amplitude")
+    plt.savefig(os.path.join(experiment_dir, "signal_plot.png"))
+    plt.show()
+
+    # Plot the Moving Average with k_piecewise
+    plt.figure(figsize=(10, 5))
+    plt.plot(t, signal_piecewise, label="Non-stationary Signal")
+    plt.plot(t, moving_average_signal, label="Moving Average Signal")
+    plt.plot(t, moving_average_amplitude, label="Moving Average Amplitude")
+    plt.title("Non-stationary Signal and its Moving Average")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude")
+    plt.legend()
+    plt.savefig(os.path.join(experiment_dir, "moving_average_plot.png"))
+    plt.show()
+
+    # Fragment the signal into overlapping windows and calculate statistical moments
+    window_size = window_length
+    overlap = window_overlapping
+    num_windows = (len(signal_piecewise) - window_size) // (window_size - overlap) + 1
+    moments = []
+    stationarity_results = []
+    stationarity_status = []
+    independent_stationarity_status = []
+
+    for i in range(num_windows):
+        start = i * (window_size - overlap)
+        end = start + window_size
+        window_signal = signal_piecewise[start:end]
+        mean_value = np.mean(window_signal)
+        variance_value = moment_variance(window_signal)
+        skewness_value = skew(window_signal)
+        kurtosis_value = kurtosis(window_signal)
+
+        moments.append((mean_value, variance_value, skewness_value, kurtosis_value))
+
+        # Analyze stationarity
+        stationarity_result = analyze_stationarity(window_signal)
+        stationarity_results.append(stationarity_result)
+
+        # Determine stationarity status for the current window
+        if stationarity_result["kpss_p"] < 0.05:
+            independent_status = "Non-Stationary"
+        elif stationarity_result["kpss_p"] > 0.05:
+            independent_status = "Stationary"
+        else:
+            independent_status = "Non-Stationary"
+
+        independent_stationarity_status.append(independent_status)
+
+    # Print stationarity test results and compare consecutive windows
+    for i in range(1, num_windows):
+        current_result = stationarity_results[i]
+        prev_result = stationarity_results[i - 1]
+
+        # Determine current window stationarity status
+        if current_result["adf_p"] > 0.05 and current_result["kpss_p"] < 0.05:
+            current_status = "Non-Stationary"
+        elif current_result["adf_p"] < 0.05 and current_result["kpss_p"] > 0.05:
+            current_status = "Stationary"
+        else:
+            current_status = "Non-Stationary"
+
+        # Determine previous window stationarity status
+        if prev_result["adf_p"] > 0.05 and prev_result["kpss_p"] < 0.05:
+            prev_status = "Non-Stationary"
+        elif prev_result["adf_p"] < 0.05 and prev_result["kpss_p"] > 0.05:
+            prev_status = "Stationary"
+        else:
+            prev_status = "Non-Stationary"
+
+        if current_status != prev_status:
+            print(current_status, prev_status)
+            current_status = "Non-Stationary"
+        else:
+            current_status = "Stationary"
+
+        # Append the current status to the stationarity status list
+        stationarity_status.append(current_status)
+
+    moments_observation(moments, num_windows, experiment_dir)
+    return (
+        moments,
+        independent_stationarity_status,
+        stationarity_status,
+        moving_average_signal,
+    )

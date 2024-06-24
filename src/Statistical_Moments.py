@@ -86,7 +86,7 @@ def evaluate_stationarity(moments, std_multiplier=1.5):
     }
 
 
-def moments_observation(moments, num_windows, experiment_name):
+def moments_observation(moments, num_windows, experiment_name="images/temp"):
     experiment_dir = experiment_name
     os.makedirs(experiment_dir, exist_ok=True)
     means = [moment[0] for moment in moments]
