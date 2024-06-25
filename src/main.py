@@ -1,12 +1,88 @@
 from Experiments import *
+import numpy as np
 import matplotlib.pyplot as plt
 import lingam
 import networkx as nx
 
+
+from BilinearModel_CSVGenerator import write_to_csv
+from BilinearModel_Hemodynamics import Hemodynamics
+from BilinearModel_Neurodynamics import Neurodynamics
+from BilinearModel_Optics import *
+from BilinearModel_SemisyntheticNoise import *
+from BilinearModel_StimulusGenerator import *
+from BilinearModel_SyntheticNoise import *
+from Parameters.Parameters_DAG3 import Parameters_DAG3
+from Parameters.Parameters_DAG3_0 import Parameters
+from BilinearModel_Plots import *
 from fNIRS_Experiment import fNIRS_processing
 
 
-def apply_LiNGAM(dq_data):
+def generateSignals_full(params, noise_type="Synthetic", percentNoise=1):
+    parameters_dict = params
+    parameters_dict["A"] = np.array(params["A"])
+    parameters_dict["B"] = np.array(params["B"])
+    parameters_dict["C"] = np.array(params["C"])
+
+    U_stimulus, timestamps, Z, dq, dh, Y = fNIRS_Process(
+        parameters_dict, noise_type, percentNoise
+    )
+
+    response = {
+        "U_stimulus": U_stimulus.tolist(),
+        "timestamps": timestamps.tolist(),
+        "Z": Z.T.tolist(),
+        "dq": dq.tolist(),
+        "dh": dh.tolist(),
+        "Y": Y.tolist(),
+    }
+    return timestamps, U_stimulus, Z, dq, dh, Y, response
+
+
+def combine_signals():
+    # Generate signals for the first set of parameters (DAG3)
+    timestamps1, U_stimulus1, Z1, dq1, dh1, Y1, _ = generateSignals_full(
+        Parameters_DAG3, "Synthetic", 1
+    )
+
+    # Generate signals for the second set of parameters (original)
+    timestamps2, U_stimulus2, Z2, dq2, dh2, Y2, _ = generateSignals_full(
+        Parameters, "Synthetic", 1
+    )
+
+    # Adjust the start time for the second run to ensure sequential timestamps
+    start_time2 = timestamps1[-1] + (timestamps1[1] - timestamps1[0])
+    timestamps2 += start_time2  # Adjust timestamps for the second dataset
+
+    # Concatenate results along the correct dimension
+    final_timestamps = np.concatenate([timestamps1, timestamps2])
+    final_U_stimulus = np.concatenate(
+        [U_stimulus1, U_stimulus2], axis=1
+    )  # assuming U_stimulus is (nRegions, nTimestamps)
+    final_Z = np.concatenate([Z1, Z2], axis=0)
+    final_dq = np.concatenate(
+        [dq1, dq2], axis=1
+    )  # assuming dq is (nRegions, nTimestamps)
+    final_dh = np.concatenate(
+        [dh1, dh2], axis=1
+    )  # assuming dh is (nRegions, nTimestamps)
+    final_Y = np.concatenate(
+        [Y1, Y2], axis=1
+    )  # assuming Y is (2 * nRegions, nTimestamps)
+
+    # Plotting the results
+    fig, axs = plt.subplots(4, 1, figsize=(12, 16))
+    plot_Stimulus(final_U_stimulus, final_timestamps, fig, axs[0])
+    plot_neurodynamics(final_Z, final_timestamps, fig, axs[1])
+    plot_DHDQ(final_dq, final_dh, final_timestamps, fig, axs[2])
+    plot_Y(final_Y, final_timestamps, fig, axs[3])
+    plt.tight_layout()
+    plt.show()
+
+    return final_timestamps, final_U_stimulus, final_Z, final_dq, final_dh, final_Y
+
+
+def apply_LiNGAM(dq_data, window_label):
 
     # Assume dq_data is already transposed to have shape (n_samples, n_regions)
     n_samples, n_regions = dq_data.shape
@@ -52,9 +128,79 @@ def apply_LiNGAM(dq_data):
     )
     labels = nx.get_edge_attributes(G, "weight")
     nx.draw_networkx_edge_labels(G, pos, edge_labels=labels)
-
-    plt.title("Estimated Causal Graph")
+    title = "Estimated Causal Graph:" + " " + window_label
+    plt.title(title)
     plt.show()
+
+
+def fNIRS_Process(Parameters, NoiseSelection, percentNoise=0):
+    """
+    Process the fNIRS data.
+
+    Returns:
+        U_stimulus: Stimulus signal
+        timestamps: Array of timestamps
+        Z: Neurodynamics
+        dq, dh: Derivatives of blood volume and deoxyhemoglobin concentration
+        Y: Optics output
+        qj, pj: Hemodynamics data
+    """
+    U_stimulus, timestamps = bilinear_model_stimulus_train_generator(
+        Parameters["freq"],
+        Parameters["actionTime"],
+        Parameters["restTime"],
+        Parameters["cycles"],
+        Parameters["A"].shape[0],
+    )
+    # Initialize the state of the neurodynamics
+    Z0 = np.zeros([Parameters["A"].shape[0]])
+    # Compute the neurodynamics of the system
+    Z = Neurodynamics(
+        Z0, timestamps, Parameters["A"], Parameters["B"], Parameters["C"], U_stimulus
+    )
+
+    # Process hemodynamics
+    qj, pj = Hemodynamics(Z.T, Parameters["P_SD"], Parameters["step"])
+
+    pj_noise = pj.copy()
+    qj_noise = qj.copy()
+    dq, dh = calculate_hemoglobin_changes(pj, qj)
+    if percentNoise > 0:
+        # PhysiologicalNoise Inclusion
+        if NoiseSelection == "Synthetic":
+            noise_types = [
+                "heart",
+                "breathing",
+                "vasomotion",
+                "white",
+            ]  # Types of noise to generate
+            # Example percent error
+            noises_with_gains = synthetic_physiological_noise_model(
+                timestamps, noise_types, pj_noise, percentNoise
+            )
+            # Labels corresponding to the noise types
+            labels = ["Heart Rate", "Vasomotion", "Breathing Rate", "White"]
+
+            # Combine the noises into hemodyanmics
+            combined_noises = combine_noises(noises_with_gains, pj_noise.shape[0])
+
+            # Add the combined noise to qj and pj
+            qj_noise = qj_noise + combined_noises
+            pj_noise = pj_noise + combined_noises
+
+        elif NoiseSelection == "Semisynthetic":
+            semisynthetic_noises = semisynthecticDataExtraction(
+                Parameters["A"].shape[0], Parameters["freq"], len(timestamps)
+            )
+
+            qj_noise, pj_noise = add_noise_to_hemodynamics(
+                qj_noise, pj_noise, semisynthetic_noises, percentNoise, timestamps
+            )
+
+    # Process optics
+    Y, dq, dh = BilinearModel_Optics(pj_noise, qj_noise, U_stimulus, Parameters["A"])
+
+    return U_stimulus, timestamps, Z, dq, dh, Y
 
 
 def analyze_signal_windows(
@@ -64,7 +210,11 @@ def analyze_signal_windows(
     analyze_stationarity,
     moment_variance,
 ):
-    num_windows = (len(signal_piecewise) - window_size) // (window_size - overlap) + 1
+
+    num_windows = (signal_piecewise.shape[1] - window_size) // (
+        window_size - overlap
+    ) + 1
+
     moments = []
     stationarity_results = []
     stationarity_status = []
@@ -73,7 +223,7 @@ def analyze_signal_windows(
     for i in range(num_windows):
         start = i * (window_size - overlap)
         end = start + window_size
-        window_signal = signal_piecewise[start:end]
+        window_signal = signal_piecewise[0, start:end]
         mean_value = np.mean(window_signal)
         variance_value = moment_variance(window_signal)
         skewness_value = skew(window_signal)
@@ -103,11 +253,15 @@ def analyze_signal_windows(
         current_result = stationarity_results[i]
         prev_result = stationarity_results[i - 1]
         transition_detected = False
-
+        current_window_signal_full = signal_piecewise[
+            :, i * (window_size - overlap) : i * (window_size - overlap) + window_size
+        ]
+        """
         print(
             f"Window {i} to {i + 1}: Current (ADF p-value={current_result['adf_p']:.4f}, KPSS p-value={current_result['kpss_p']:.4f}) vs "
             f"Previous (ADF p-value={prev_result['adf_p']:.4f}, KPSS p-value={prev_result['kpss_p']:.4f})"
         )
+        """
         current_status = ""
         # Determine current window stationarity status
         if current_result["adf_p"] > 0.05 and current_result["kpss_p"] < 0.05:
@@ -119,7 +273,7 @@ def analyze_signal_windows(
 
         else:
             # current_status = "Non-Stationary"
-            prev_status = "Stationary"
+            current_status = "Stationary"
 
         # Determine previous window stationarity status
         if prev_result["adf_p"] > 0.05 and prev_result["kpss_p"] < 0.05:
@@ -140,6 +294,7 @@ def analyze_signal_windows(
             )
             print("Trigger LinGAM")
             # Here trigger Lingam
+
         else:
             transition_detected = False
             print(f"No transition detected in window {i + 1}.")
@@ -149,6 +304,9 @@ def analyze_signal_windows(
             f"Window {i} to {i + 1}: {'Non-Stationary' if current_status == 'Non-Stationary' else 'Stationary'}"
         )
 
+        if transition_detected:
+            apply_LiNGAM(current_window_signal_full.T, f"Window {i}")
+
         # Append the current status to the stationarity status list
         stationarity_status.append(current_status)
 
@@ -157,8 +315,11 @@ def analyze_signal_windows(
 
 
 def main():
-    n_region = 3
-    Timestamps, Hemodynamics, OD = fNIRS_processing()
+
+    # Timestamps, Hemodynamics, OD = fNIRS_processing()
+    final_timestamps, final_U_stimulus, final_Z, final_dq, final_dh, final_Y = (
+        combine_signals()
+    )
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # Colors for better distinction
@@ -171,59 +332,17 @@ def main():
         "tab:brown",
     ]
 
-    for i in range(0, n_region * 2, 2):
-        region_index = i // 2 + 1
-        ax.plot(
-            Timestamps,
-            OD[i, :],
-            label=f"OD{region_index}",
-            color=colors[i % len(colors)],
-        )
-        ax.plot(
-            Timestamps,
-            OD[i + 1, :],
-            label=f"OD{region_index}",
-            color=colors[(i + 1) % len(colors)],
-        )
+    initial = final_dh[:, : len(final_dh[0]) // 4]
+    oxyhemo = final_dh
 
-    ax.set_title("Optics Time")
-    ax.set_xlabel("Time (seconds)")
-    ax.set_ylabel("OD Changes")
-    ax.legend()
-    plt.show()
+    apply_LiNGAM(initial.T, "Full_Signal")
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    for i in range(0, n_region * 2, 2):
-        region_index = i // 2 + 1
-        ax.plot(
-            Timestamps,
-            Hemodynamics[i, :],
-            label=f"HbO_Region{region_index}",
-            color=colors[i % len(colors)],
-        )
-        ax.plot(
-            Timestamps,
-            Hemodynamics[i + 1, :],
-            label=f"HbR_Region{region_index}",
-            color=colors[(i + 1) % len(colors)],
-        )
-
-    ax.set_title("Hemodynamics over Time")
-    ax.set_xlabel("Time (seconds)")
-    ax.set_ylabel("Concentration Changes")
-    ax.legend()
-    plt.show()
-
-    indices = [i * 2 + 1 for i in range(n_region)]
-    oxyhemo = Hemodynamics[indices, :]
-    print(len(oxyhemo))
     window_size = 20 * 10
     overlap = 10 * 10
 
     moments, independent_stationarity_status, stationarity_status = (
         analyze_signal_windows(
-            oxyhemo[0], window_size, overlap, analyze_stationarity, moment_variance
+            oxyhemo, window_size, overlap, analyze_stationarity, moment_variance
         )
     )
     binary_values_Independent = [
